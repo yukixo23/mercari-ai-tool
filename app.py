@@ -7,6 +7,11 @@ load_dotenv()
 
 client = OpenAI() 
 
+def clear_all():
+    st.session_state["note"] = ""
+    st.session_state["result"] = ""
+    st.session_state["condition"] = "選択してください"
+
 st.title("メルカリAI出品サポート") 
 
 
@@ -14,96 +19,161 @@ st.title("メルカリAI出品サポート")
 if "result" not in st.session_state:
     st.session_state.result = ""
 
+if "signature" not in st.session_state:
+    st.session_state["signature"] = "株式会社〇〇"
+
 # 画像アップ
-uploaded_file = st.file_uploader("商品画像", type=["jpg", "png"])
+uploaded_files = st.file_uploader(
+    "商品画像", 
+    type=["jpg", "png"],
+    accept_multiple_files=True
+    )
+
+# 上限チェック（10枚）
+MAX_FILES = 10
+if uploaded_files and len(uploaded_files) > MAX_FILES:
+    st.warning(f"画像は最大{MAX_FILES}枚までアップロードできます")
+    st.stop()
+
+# 枚数表示
+if uploaded_files:
+    st.write(f"📷 {len(uploaded_files)}枚選択中")
 
 # 画像プレビュー
-if uploaded_file is not None:
-    st.image(uploaded_file, caption="アップロード画像", use_container_width=True)
+if uploaded_files :
+    for file in uploaded_files:
+        st.image(file, caption=file.name, use_container_width=True)
 
 # 商品状態
 condition = st.selectbox(
     "商品の状態",
-    ["選択してください", "新品・未使用", "未使用に近い", "目立った傷や汚れなし", "やや傷や汚れあり", "傷や汚れあり"]
+    ["選択してください", "新品・未使用", "未使用に近い", "目立った傷や汚れなし", "やや傷や汚れあり", "傷や汚れあり"],
+    key="condition"
 )
 
 # 補足情報
 note = st.text_area(
     "補足情報",
-    placeholder="例: 小さな傷あり / 箱なし / 2022年購入 / サイズM"
+    placeholder="例: 小さな傷あり / 箱なし / 2022年購入 / サイズM",
+    key="note"
+)	
+
+# 署名
+signature = st.text_input(
+    "署名（会社名など）",
+    placeholder="例: 株式会社〇〇",
+    key="signature"
 )
 
 st.divider()
 
-# AI生成ボタン
-if st.button("AIで出品文章生成"):
+# 生成ボタン・クリアボタンUI
+col1, col2 = st.columns([1, 3])
 
-    image_data = None
+with col1:
+    generate = st.button(
+        "AIで出品文章生成", 
+        key="generate_button",
+        disabled=not uploaded_files
+        )
+with col2:
+    st.button("クリア", on_click=clear_all, key="clear_button")
 
-    if uploaded_file is not None:
-        image_bytes = uploaded_file.read()
-        image_data = base64.b64encode(image_bytes).decode()
+# 生成ボタン処理
+if generate:
+
+    if not uploaded_files:
+        st.warning("画像をアップロードしてください")
+        st.stop()
+
+    results = []
+
+    signature_text = signature if signature else ""
 
     prompt = f"""
-    この商品画像を分析してください。
+この商品画像を分析してください。
 
-    まず画像から商品を推定してください。
-    そのあとメルカリ出品用の情報を作成してください。
+まず画像から商品を推定してください。
+そのあとメルカリ出品用の情報を作成してください。
 
-    商品状態: {condition}
-    補足情報: {note}
+商品状態: {condition}
+補足情報: {note}
 
-    以下の形式で出力してください。
+以下の形式で出力してください。
 
-    【商品推定】
+【商品推定】
 
-    【おすすめタイトル（5個）】
-    メルカリで検索されやすいキーワードを入れてください。
-    30文字以内。
-    1.
-    2.
-    3.
-    4.
-    5.
+【おすすめタイトル（5個）】
+1.
+2.
+3.
+4.
+5.
 
-    【カテゴリ】
+【カテゴリ】
 
-    【商品説明】
+【商品説明】
 
-    【注意事項】
-    """
+【注意事項】
 
-    messages = [
-        {
-            "role": "user",
-            "content": [{"type": "text", "text": prompt}],
-        }
-    ]
+※出力の一番最後の行に必ず以下の内容をそのまま入れてください。（変更しないでください）
+{signature_text}
+"""
 
-    if image_data:
-        messages[0]["content"].append({
-            "type": "image_url",
-            "image_url": {
-                "url": f"data:image/jpeg;base64,{image_data}"
-            }
-        })
+    progress_text = st.empty()
 
-    response = client.chat.completions.create(
-        model="gpt-4.1-mini",
-        messages=messages
-    )
+    with st.spinner(f"{len(uploaded_files)}件を生成中...（1〜2分かかります）"):
 
-    st.session_state.result = response.choices[0].message.content
+        for i, file in enumerate(uploaded_files, start=1):
+            progress_text.write(f"{i}/{len(uploaded_files)} 件処理中...")
+
+            image_bytes = file.read()
+            image_data = base64.b64encode(image_bytes).decode()
+
+            messages = [
+                {
+                    "role": "user",
+                    "content": [{"type": "text", "text": prompt}],
+                }
+            ]
+
+            messages[0]["content"].append({
+                "type": "image_url",
+                "image_url": {
+                    "url": f"data:image/jpeg;base64,{image_data}"
+                }
+            })
+
+            try:
+                response = client.chat.completions.create(
+                    model="gpt-4.1-mini",
+                    messages=messages
+                )
+
+                result_text = response.choices[0].message.content
+                results.append(f"【{i}枚目：{file.name}】\n{result_text}")
+
+            except Exception as e:
+                results.append(f"【{file.name}】エラー: {e}")
+
+    st.session_state.result = "\n\n====================\n\n".join(results)
 
 # 結果表示
 if st.session_state.result != "":
     st.subheader("AI生成結果")
 
-    st.text_area(
-        "メルカリ出品用テキスト",
-        st.session_state.result,
-        height=300
-    )
+    result_list = st.session_state.result.split("\n\n====================\n\n")
 
-    st.subheader("コピー用")
-    st.code(st.session_state.result)
+    for i, result in enumerate(result_list, start=1):
+        st.markdown(f"### {i}件目")
+
+        st.text_area(
+            f"結果 {i}",
+            result,
+            height=200,
+            key=f"result_{i}"
+        )
+
+        st.code(result)
+
+        st.caption("※右上のコピーアイコンからコピーできます")
