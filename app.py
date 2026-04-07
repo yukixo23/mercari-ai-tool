@@ -19,9 +19,6 @@ st.title("メルカリAI出品サポート")
 if "result" not in st.session_state:
     st.session_state.result = ""
 
-if "signature" not in st.session_state:
-    st.session_state["signature"] = "株式会社〇〇"
-
 # 画像アップ
 uploaded_files = st.file_uploader(
     "商品画像", 
@@ -58,11 +55,12 @@ note = st.text_area(
     key="note"
 )	
 
-# 署名
-signature = st.text_input(
-    "署名（会社名など）",
-    placeholder="例: 株式会社〇〇",
-    key="signature"
+# 固定文章
+signature = st.text_area(
+    "固定テキスト",
+    placeholder="例:株式会社〇〇公式ショップです。 即購入OKです。",
+    key="signature",
+    height=100
 )
 
 st.divider()
@@ -122,7 +120,7 @@ if generate:
 
     progress_text = st.empty()
 
-    with st.spinner(f"{len(uploaded_files)}件を生成中...（1〜2分かかります）"):
+    with st.spinner(f"{len(uploaded_files)}件を生成中..."):
 
         for i, file in enumerate(uploaded_files, start=1):
             progress_text.write(f"{i}/{len(uploaded_files)} 件処理中...")
