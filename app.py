@@ -168,10 +168,18 @@ if st.session_state.result != "":
         st.text_area(
             f"結果 {i}",
             result,
-            height=200,
+            height=400,
             key=f"result_{i}"
         )
 
-        st.code(result)
+        # コピー用（カテゴリ以降 + 固定テキスト）
+        parts = result.split("【カテゴリ】")
 
-        st.caption("※右上のコピーアイコンからコピーできます")
+        if len(parts) > 1:
+            copy_text = "【カテゴリ】" + parts[1]
+        else:
+            copy_text = result
+
+        st.code(copy_text)
+
+        st.caption("※カテゴリ・商品説明・注意事項＋固定テキストのみコピーできます")
