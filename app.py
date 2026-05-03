@@ -172,14 +172,14 @@ if st.session_state.result != "":
             key=f"result_{i}"
         )
 
-        # コピー用（カテゴリ以降 + 固定テキスト）
-        parts = result.split("【カテゴリ】")
+        # コピー用（商品説明以降 + 固定テキスト）
+        parts = result.split("【商品説明】")
 
         if len(parts) > 1:
-            copy_text = "【カテゴリ】" + parts[1]
+            copy_text = "【商品説明】" + parts[1]
         else:
             copy_text = result
 
         st.code(copy_text)
 
-        st.caption("※カテゴリ・商品説明・注意事項＋固定テキストのみコピーできます")
+        st.caption("※商品説明・注意事項＋固定テキストのみコピーできます")
